@@ -8,7 +8,7 @@ def get_angles(sample,n):
     Following is assumed: [sample]ns (so it is always symmetrical)
     :param sample: sample of angles
     :param n: times it has to be repeated
-    :return:
+    :return: list of angles of length n*2 which is symmetrical
     """
     #account for the n and make it appropriate
     angles = []
@@ -366,7 +366,7 @@ class Laminate:
         self.strains = self.strains[:, arr1inds[::-1]]
         return self.sigmas,self.z_laminate
 
-    def Puck_failure(self,Xt,Yt,Xc,Yc,S12,insitu=False):
+    def Puck_failure_envelope(self,Xt,Yt,Xc,Yc,S12,insitu=False):
         """
         This functions uses puck criteria to calculate the failure envelope, this is done using slides of Lecture 8.
         Disclaimer fpf should be good lpf does not work!
@@ -511,7 +511,7 @@ class Laminate:
 
         return Nx_fpf_lst,Ns_fpf_lst,Nx_lpf_lst,Ns_lpf_lst,strainx_fpf_lst,strainss_fpf_lst
 
-    def Hashin_failure(self,Xt,Yt,Xc,Yc,S12,insitu=False):
+    def Hashin_failure_envelope(self,Xt,Yt,Xc,Yc,S12,insitu=False):
         """
         This functions uses puck criteria to calculate the failure envelope, this is done using slides of Lecture 8.
         Disclaimer fpf should be good lpf does not work!
@@ -636,7 +636,83 @@ class Laminate:
 
         return Nx_fpf_lst, Ns_fpf_lst, Nx_lpf_lst, Ns_lpf_lst, strainx_fpf_lst, strainss_fpf_lst
 
+    def Hashin_failure(self,Xt,Yt,Xc,Yc,S12,insitu=False):
+        """
+        This functions uses Hashin criteria to calculate fpf, this is done using slides of Lecture 8.
+        Disclaimer fpf should be good lpf does not work!
+        :param Xt: [Pa]
+        :param Yt: [Pa]
+        :param Xc: [Pa]
+        :param Yc: [Pa]
+        :param S12: [Pa]
+        :param insitu: Optional, Default=False. If true calculates failure with insitu strengths
+        :return: Nx_fpf_lst(List of Nx for fpf), Ns_fpf_lst(List of Ns for fpf), Nx_lpf_lst(List of Nx for lpf), Ns_lpf_lst(List of Ns for lpf), strainx_fpf_lst(List of strains in xdirection for fpf),strainss_fpf_lst(List of shear strains for fpf)
+        """
+        def insitu_func(inner,E1,E2,G12,mu21):
 
+            beta = 1.04*1e-26 #[Pa^-3]
+            Gic = 258 #[N/m]
+            Giic = 1080 #[N/m]
+
+            delta22 = 2 * (1 / E2 - mu21 ** 2 / E1)
+            if inner:
+                phi = 48 * Giic / np.pi / self.plies[0].t
+                S12_insitu = np.sqrt((np.sqrt(1+beta*phi*G12**2)-1)/3/beta/G12)
+                Yt = np.sqrt(8*Gic/np.pi/self.plies[0].t/delta22)
+            else:
+                phi = 24 * Giic / np.pi / self.plies[0].t
+                S12_insitu = np.sqrt((np.sqrt(1 + beta * phi * G12 ** 2) - 1) / 3 / beta / G12)
+                Yt = 1.79*np.sqrt(Gic/np.pi/self.plies[0].t/delta22)
+
+            return S12_insitu,Yt
+
+
+        # start loop to search failurepoints
+        mode = ''
+        # loop over plies to check them each for failure
+        for idx, ply in enumerate(self.plies):
+            if not ply.failed:
+                #account for the insitu condition
+                if insitu:
+                    if idx==0 or idx == self.n_plies-1:
+                        S12,Yt = insitu_func(False,ply.E1,ply.E2,ply.G12,ply.v21)
+                    else:
+                        S12, Yt = insitu_func(True,ply.E1,ply.E2, ply.G12, ply.v21)
+
+
+            tau12 = ply.abs_max_sigma3
+
+            # FF
+            if ply.abs_max_sigma1>0:
+                crit_ten = (ply.abs_max_sigma1/Xt)**2+1/S12**2*(tau12**2)
+                if crit_ten> 1:
+                    mode ='FF'
+                    n_ply = idx
+            if ply.abs_max_sigma1<0:
+                if abs(ply.abs_max_sigma1) > Xc:
+                    mode='FF'
+                    n_ply = idx
+
+            #IFF
+            sigma2 = ply.abs_max_sigma2
+            #tension criteria
+            if sigma2>0:
+                crit_M_T = sigma2**2/Yt**2+tau12**2/S12**2
+                if crit_M_T>1:
+                    mode = 'IFF'
+                    n_ply = idx
+            #compression criteria
+            elif sigma2<0:
+                # crit_M_C = (((-Yc)/(2*S12))**2-1)*sigma2/(-Yc)+(sigma2/(2*S12))**2+tau12/S12
+                crit_M_C = (-sigma2)/Yc+tau12**2/S12**2
+                if crit_M_C>1:
+                    mode = 'IFF'
+                    n_ply = idx
+
+
+                if mode=='IFF' or mode=='FF':
+                    failure = True
+        return failure
     def __str__(self):
 
         text = '\nGeneral Parameters of the Laminate: \n'

@@ -278,31 +278,39 @@ def shear_flow_C2(lams,bs,V):
     q_arr[50:100] = Ebi2*V/I_xx*lams[1].h*(0.5*s_arr2**2+(lams[0].h-y_bar)*s_arr2)+q_arr[49]
     q_arr[100::] = Ebi3 * V / I_xx * lams[2].h * y3 * s_arr3+q_arr[99]
     return q_arr
+
+def weight(lams,bs,density):
+    Area = 0
+    L = 1.75*2*m.pi
+    for idx,lam in enumerate(lams):
+        Area += lam.h*bs[idx]
+    return L*Area*density
 #####-------------------------------------------------------END Helper functions----------------------------------------------------
 
 
 
 #####-------------------------------------------------------define material properties----------------------------------------------------
 #everything is given in SI units (no mega or giga except density=[kg/m3])
+knockdown = 0.8**2*0.65 #see lecture 1
 props = material_properties('UD')
 Ex = props[0]
 Ey = props[1]
 Gxy = props[2]
 vxy = props[3]
 t_ply = props[4]
-Xt = props[5]
-Xc = props[6]
-Yt = props[7]
-Yc = props[8]
-S = props[9]
-S_il = props[10]
+Xt = props[5]*knockdown
+Xc = props[6]*knockdown
+Yt = props[7]*knockdown
+Yc = props[8]*knockdown
+S = props[9]*knockdown
+S_il = props[10]*knockdown
 density = props[11]
 #####-------------------------------------------------------END define material properties----------------------------------------------------
 
-with st.sidebar:
-    n = st.slider('multiplier',1,20)
+#####-------------------------------------------------------Define Laminates of flanges and web----------------------------------------------------
 #creat the bottom flange laminate
-angles = get_angles([45,0,0,0,0,0,-45],n)
+angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],2)
+
 #get all z_coordinates
 z_coord = []
 n_halfplies = len(angles)/2
@@ -316,12 +324,14 @@ for idx,angle in enumerate(angles):
 
 
 #creat the top flange laminate
-angles = get_angles([45,0,0,0,0,0,-45],n)
+angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],2)
+
 #get all z_coordinates
 z_coord = []
 n_halfplies = len(angles)/2
 for i in range(len(angles)):
     z_coord.append([(-n_halfplies+i)*t_ply,t_ply*(-n_halfplies+i+1)])
+
 #Create laminate as an object and add individual plies
 flange_top = Laminate()
 for idx,angle in enumerate(angles):
@@ -329,69 +339,80 @@ for idx,angle in enumerate(angles):
 
 
 #creat the web plate laminate
-angles = get_angles([45,-45,45,-45,0,0],n)
+angles = get_angles([45,-45,90,20,-20,45,90,-45,0,0,45,-45],1)
+
 #get all z_coordinates
 z_coord = []
 n_halfplies = len(angles)/2
 for i in range(len(angles)):
     z_coord.append([(-n_halfplies+i)*t_ply,t_ply*(-n_halfplies+i+1)])
+
 #Create laminate as an object and add individual plies
 web = Laminate()
 for idx,angle in enumerate(angles):
     web.add_plies(Lamina(angle*m.pi/180,Ex,Ey,vxy,Gxy,z_coord[idx][0],z_coord[idx][1])) #from bottom to top
-flange_top.general_params(),flange_bot.general_params(),web.general_params()
 
+#calculates general parameters needed for later calculations
+flange_top.general_params(),flange_bot.general_params(),web.general_params()
+#####-------------------------------------------------------END Define Laminates of flanges and web----------------------------------------------------
+
+
+#####-------------------------------------------------------Interactive streamlit display----------------------------------------------------
 st.write('Thicknesses of the plates are',flange_top.h,flange_bot.h,web.h)
-F1_lst = []
-F2_lst = []
-F3_lst = []
-M1_lst = []
-M2_lst = []
-M3_lst = []
-V1_lst = []
-V2_lst = []
-V3_lst = []
 with st.sidebar:
     b1,b2,b3 = st.slider('b bottom flange [cm]',1,50)/100,st.slider('b web [cm]',1,35)/100,st.slider('b top flange [cm]',1,50)/100
-bs = [b1,b2,b3]
-lams = [flange_bot,web,flange_top]
+# b1,b2,b3 = 0.3,0.35,0.3 # Comment this line if you do not want streamlit
+bs = [b1,b2,b3] #list of widths of flanges and web
+lams = [flange_bot,web,flange_top] #list of laminate objects
 
-#visualise with streamlit
+# Get angle for where to calculate
 st.title('Show stresses in function of theta')
 with st.sidebar:
     theta = st.slider('theta',0,90)
+# theta = 40 #Comment this line if you do not want streamlit
 
+#get forces and moments at corresponding theta
 N,M,V = get_main_forces(theta)
 force = forces(lams,bs,N)
 moment = moments(lams,bs,M)
-shear_flow = shear_flow_C2(lams,bs,V)
+shear_flow = shear_flow_C2(lams,bs,V) #calculates the shearflow.
 
-k_beam = 1 / radius(lams, bs, M)
+k_beam = 1 / radius(lams, bs, M) #determine the curvature using lecture 4 slides
 st.write(f'The bending curvature is {k_beam}.')
 st.subheader('Stress throughout the layers of the bottom flange')
+
+#calculate the strains from axial load and shear flow
 strains = flange_bot.calc_strains(np.array([force[0]/bs[0],0,shear_flow[0:50].max()]),np.array([0,0,0]))
+#manually add the curvature to the strains 
 flange_bot.strains_curvs[0] = (lams[0].h/2-neutral_axis_bending(lams, bs))*k_beam
 flange_bot.strains_curvs[3] = k_beam
 flange_bot.strains_curvs[4::] = 0
 
+#calculate the stresses throughout the laminate and plot it
 stresses,z = flange_bot.stress(points_per_ply=20)
 fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
 ax[0].axvline(-Xc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_1$')
 ax[1].plot(stresses[1],z)
 ax[1].axvline(Yt,linestyle='dashed',color='r')
 ax[1].axvline(-Yc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_2$')
 ax[2].plot(stresses[2],z)
 ax[2].axvline(S,linestyle='dashed',color='r')
 ax[2].axvline(-S,linestyle='dashed',color='r')
 ax[0].grid(True)
 ax[2].grid(True)
 ax[1].grid(True)
+plt.xlabel('$\sigma_6$')
+# plt.show() #comment this line in to get plots in IDE
 st.pyplot(fig)
 
 st.subheader('Stress throughout the layers of the web')
-strains = web.calc_strains(np.array([force[1]/bs[1],0,shear_flow[50:100].max()]),np.array([0,moment[1]/bs[1],0]))
+#calculate the strains from axial load and shear flow
+strains = web.calc_strains(np.array([force[1]/bs[1],0,shear_flow[50:100].max()]),np.array([0,0,0]))
+#manually add the curvature to the strains
 web.strains_curvs[3::] = 0
 web.strains_curvs[5] = k_beam #find out which curvature this realy is
 
@@ -400,20 +421,25 @@ fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
 ax[0].axvline(-Xc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_1$')
 ax[1].plot(stresses[1],z)
 ax[1].axvline(Yt,linestyle='dashed',color='r')
 ax[1].axvline(-Yc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_2$')
 ax[2].plot(stresses[2],z)
 ax[2].axvline(S,linestyle='dashed',color='r')
 ax[2].axvline(-S,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_6$')
 ax[0].grid(True)
 ax[2].grid(True)
 ax[1].grid(True)
+# plt.show() #comment this line in to get plots in IDE
 st.pyplot(fig)
 
 
 st.subheader(f'Stress throughout the layers of the top flange \n with plies {len(flange_top.rotations)} plies with orientations: {flange_top.rotations}')
 strains = flange_top.calc_strains(np.array([force[2]/bs[2],0,shear_flow[100::].max()]),np.array([moment[2]/bs[2],0,0]))
+#manually add the curvature to the strains
 flange_top.strains_curvs[0] = (lams[0].h+bs[1]+lams[2].h/2-neutral_axis_bending(lams, bs))*k_beam
 flange_top.strains_curvs[3] = k_beam
 flange_top.strains_curvs[4::] = 0
@@ -423,18 +449,24 @@ fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
 ax[0].axvline(-Xc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_1$')
 ax[1].plot(stresses[1],z)
 ax[1].axvline(Yt,linestyle='dashed',color='r')
 ax[1].axvline(-Yc,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_2$')
 ax[2].plot(stresses[2],z)
 ax[2].axvline(S,linestyle='dashed',color='r')
 ax[2].axvline(-S,linestyle='dashed',color='r')
+plt.xlabel('$\sigma_6$')
 ax[0].grid(True)
 ax[2].grid(True)
 ax[1].grid(True)
+# plt.show() #comment this line in to get plots in IDE
 st.pyplot(fig)
+
 
 st.subheader('Moments of the flanges and webs')
 fig,ax = plt.subplots()
 ax.bar([1,2,3],moment)
 st.pyplot(fig)
+#####-------------------------------------------------------END Interactive streamlit display----------------------------------------------------
