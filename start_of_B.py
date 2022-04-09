@@ -305,6 +305,26 @@ def weight(lams,bs,density):
     for idx,lam in enumerate(lams):
         Area += lam.h*bs[idx]
     return L*Area*density
+
+def make_lam(angles):
+    """
+    Takes in the orientations and gives a laminate object
+    :param angles:
+    :return:
+    """
+    # get all z_coordinates
+    z_coord = []
+    n_halfplies = len(angles) / 2
+    for i in range(len(angles)):
+        z_coord.append([(-n_halfplies + i) * t_ply, t_ply * (-n_halfplies + i + 1)])
+
+    # Create laminate as an object and add individual plies
+    obj = Laminate()
+    for idx, angle in enumerate(angles):
+        obj.add_plies(
+            Lamina(angle * m.pi / 180, Ex, Ey, vxy, Gxy, z_coord[idx][0], z_coord[idx][1]))  # from bottom to top
+    return obj
+
 #####-------------------------------------------------------END Helper functions----------------------------------------------------
 
 
@@ -329,7 +349,7 @@ density = props[11]
 
 #####-------------------------------------------------------Define Laminates of flanges and web----------------------------------------------------
 #creat the bottom flange laminate
-angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],2)
+angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],1)
 
 #get all z_coordinates
 z_coord = []
@@ -344,7 +364,7 @@ for idx,angle in enumerate(angles):
 
 
 #creat the top flange laminate
-angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],2)
+angles = get_angles([45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,15,0,0,90,0,0,45,90,-45,0,0,90,0,0,-15,90,15,0,0,0,0,90,90,90,90,0,0,0,0,45,90,-45,0,0],1)
 
 #get all z_coordinates
 z_coord = []
@@ -359,7 +379,7 @@ for idx,angle in enumerate(angles):
 
 
 #creat the web plate laminate
-angles = get_angles([45,-45,90,20,-20,45,90,-45,0,0,45,-45],1)
+angles = get_angles([45,-45,90,20,-20,45,90,-45,0,0,45,-45],3)
 
 #get all z_coordinates
 z_coord = []
@@ -403,13 +423,14 @@ st.subheader('Stress throughout the layers of the bottom flange')
 
 #calculate the strains from axial load and shear flow
 strains = flange_bot.calc_strains(np.array([force[0]/bs[0],0,shear_flow[0:50].max()]),np.array([0,0,0]))
-#manually add the curvature to the strains 
+#manually add the curvature to the strains
 flange_bot.strains_curvs[0] = (lams[0].h/2-neutral_axis_bending(lams, bs))*k_beam
 flange_bot.strains_curvs[3] = k_beam
 flange_bot.strains_curvs[4::] = 0
 
 #calculate the stresses throughout the laminate and plot it
 stresses,z = flange_bot.stress(points_per_ply=20)
+st.write(f'It fails? {flange_bot.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True)}')
 fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
@@ -437,6 +458,7 @@ web.strains_curvs[3::] = 0
 web.strains_curvs[5] = k_beam #find out which curvature this realy is
 
 stresses,z = web.stress(points_per_ply=20)
+st.write(f'It fails? {web.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True)}')
 fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
@@ -457,7 +479,7 @@ ax[1].grid(True)
 st.pyplot(fig)
 
 
-st.subheader(f'Stress throughout the layers of the top flange \n with plies {len(flange_top.rotations)} plies with orientations: {flange_top.rotations}')
+st.subheader(f'Stress throughout the layers of the top flange \n with plies {len(flange_top.rotations)} plies.')
 strains = flange_top.calc_strains(np.array([force[2]/bs[2],0,shear_flow[100::].max()]),np.array([moment[2]/bs[2],0,0]))
 #manually add the curvature to the strains
 flange_top.strains_curvs[0] = (lams[0].h+bs[1]+lams[2].h/2-neutral_axis_bending(lams, bs))*k_beam
@@ -465,6 +487,7 @@ flange_top.strains_curvs[3] = k_beam
 flange_top.strains_curvs[4::] = 0
 
 stresses,z = flange_top.stress(points_per_ply=20)
+st.write(f'It fails? {flange_top.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True)}')
 fig,ax = plt.subplots(1,3)
 ax[0].plot(stresses[0],z)
 ax[0].axvline(Xt,linestyle='dashed',color='r')
@@ -490,3 +513,64 @@ fig,ax = plt.subplots()
 ax.bar([1,2,3],moment)
 st.pyplot(fig)
 #####-------------------------------------------------------END Interactive streamlit display----------------------------------------------------
+
+
+#####-------------------------------------------------------Find best layup/bs combo at theta==90-----------------------------
+base_sample = [[45,90,-45],[0,0],[0,0],[0,0]]
+angles_og = [45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0]
+weight_lst = []
+layup_lst = []
+bs_lst = []
+theta = 90
+for b1 in range(30,51):
+    print(f'Progress= {round((b1-30)/20*100,2)}%')
+    bs = [b1/100,0.35,b1/100]
+    idx_base = 0
+    angles = angles_og.copy()
+    failure = True
+    while failure:
+        failure_lst = []
+        #make 3 laminates and put them in a list
+        angles += base_sample[idx_base]
+        angles_sym = get_angles(angles,1)
+        lams = [make_lam(angles_sym),web,make_lam(angles_sym)]
+        #change index basesample:
+        idx_base +=1
+        if idx_base==len(base_sample):
+            idx_base = 0
+
+        #evaluate the forces at theta=90deg
+        N, M, V = get_main_forces(theta)
+        force = forces(lams, bs, N)
+        moment = moments(lams, bs, M)
+        shear_flow = shear_flow_C2(lams, bs, V)  # calculates the shearflow.
+
+        k_beam = 1 / radius(lams, bs, M)  # determine the curvature using lecture 4 slides
+
+        #evaluat stresses for each laminate togethher with buckling criteria
+        for idx,lam in enumerate(lams):
+            if idx != 1:
+                strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, shear_flow[50*idx:(50*idx+1)].max()]),
+                                                  np.array([0, 0, 0]))
+                # manually add the curvature to the strains
+                lam.strains_curvs[0] = (lams[0].h / 2 - neutral_axis_bending(lams, bs)) * k_beam * (1-2*idx)
+                lam.strains_curvs[3] = k_beam
+                lam.strains_curvs[4::] = 0
+
+                stresses,z = lam.stress(points_per_ply=10)
+                if lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True):
+                    failure_lst.append(True)
+                else:
+                    failure_lst.append(False)
+        if failure_lst[0]==False and failure_lst[1]==False:
+            failure = False
+    weight_lst.append(weight(lams,bs,density))
+    layup_lst.append(angles)
+    bs_lst.append(bs)
+
+#get index of lowest weight
+idx_opt = weight_lst.index(min(weight_lst))
+print(layup_lst[idx])
+print(bs_lst[idx])
+print('Thickness of the laminate: ',len(layup_lst[idx])*t_ply)
+print('Number of plies: ',len(layup_lst[idx]))

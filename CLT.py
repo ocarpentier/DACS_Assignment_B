@@ -667,19 +667,18 @@ class Laminate:
 
         # start loop to search failurepoints
         mode = ''
+        failure=False
         # loop over plies to check them each for failure
         for idx, ply in enumerate(self.plies):
-            if not ply.failed:
-                #account for the insitu condition
-                if insitu:
-                    if idx==0 or idx == self.n_plies-1:
-                        S12,Yt = insitu_func(False,ply.E1,ply.E2,ply.G12,ply.v21)
-                    else:
-                        S12, Yt = insitu_func(True,ply.E1,ply.E2, ply.G12, ply.v21)
+            #account for the insitu condition
+            if insitu:
+                if idx==0 or idx == self.n_plies-1:
+                    S12,Yt = insitu_func(False,ply.E1,ply.E2,ply.G12,ply.v21)
+                else:
+                    S12, Yt = insitu_func(True,ply.E1,ply.E2, ply.G12, ply.v21)
 
 
             tau12 = ply.abs_max_sigma3
-
             # FF
             if ply.abs_max_sigma1>0:
                 crit_ten = (ply.abs_max_sigma1/Xt)**2+1/S12**2*(tau12**2)
@@ -689,7 +688,6 @@ class Laminate:
             if ply.abs_max_sigma1<0:
                 if abs(ply.abs_max_sigma1) > Xc:
                     mode='FF'
-                    n_ply = idx
 
             #IFF
             sigma2 = ply.abs_max_sigma2
@@ -698,18 +696,17 @@ class Laminate:
                 crit_M_T = sigma2**2/Yt**2+tau12**2/S12**2
                 if crit_M_T>1:
                     mode = 'IFF'
-                    n_ply = idx
+
             #compression criteria
             elif sigma2<0:
                 # crit_M_C = (((-Yc)/(2*S12))**2-1)*sigma2/(-Yc)+(sigma2/(2*S12))**2+tau12/S12
                 crit_M_C = (-sigma2)/Yc+tau12**2/S12**2
                 if crit_M_C>1:
                     mode = 'IFF'
-                    n_ply = idx
 
 
-                if mode=='IFF' or mode=='FF':
-                    failure = True
+            if mode=='IFF' or mode=='FF':
+                failure = True
         return failure
     def __str__(self):
 
