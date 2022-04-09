@@ -317,8 +317,6 @@ class Laminate:
         self.vfxy = -D_inv[0,1]/D_inv[0,0]
         self.vfyx = -D_inv[0,1]/D_inv[1,1]
 
-
-
     def stress(self,points_per_ply=50,coordinates='local'):
         """
         Calculates the stresses throughout the layers based on the strains and curvatures.
@@ -646,7 +644,7 @@ class Laminate:
         :param Yc: [Pa]
         :param S12: [Pa]
         :param insitu: Optional, Default=False. If true calculates failure with insitu strengths
-        :return: Nx_fpf_lst(List of Nx for fpf), Ns_fpf_lst(List of Ns for fpf), Nx_lpf_lst(List of Nx for lpf), Ns_lpf_lst(List of Ns for lpf), strainx_fpf_lst(List of strains in xdirection for fpf),strainss_fpf_lst(List of shear strains for fpf)
+        :return: Boolean True if fpf has occured, false if not.
         """
         def insitu_func(inner,E1,E2,G12,mu21):
 

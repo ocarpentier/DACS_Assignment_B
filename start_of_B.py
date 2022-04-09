@@ -174,6 +174,12 @@ def equivalent_EI(lams, bs):
     return sum(EI_lst)
 
 def Ixx(lams,bs):
+    """
+    Moment of inertia for isotropic structures
+    :param lams: list of 3 laminate objects [bottom flange, web, top flange]
+    :param bs: the heihgt of the corresponding flanges as seen as cross section.
+    :return: Moment of inertia
+    """
     y_bar = neutral_axis_bending(lams, bs)
     s = 0
     Ixx_lst = []
@@ -192,6 +198,13 @@ def Ixx(lams,bs):
     return sum(Ixx_lst)
 
 def shear_flow_C(lams,bs,V):
+    """
+    Uses equation q=V*Q/I but seems wrong
+    :param lams:
+    :param bs:
+    :param V:
+    :return:
+    """
     y_bar = neutral_axis_bending(lams, bs) #bending neutral axis because shear is related to bending
     I_xx = Ixx(lams,bs)
     q_lst  = [[],[],[]]
@@ -233,6 +246,13 @@ def buckling(lam,a,b,Nx,Nxy):
     return N0>-Nx
 
 def Ixx_accent(lams,bs):
+    """
+    Function to calculate the moment of inertia for beam including the different stiffnesses.
+    (chapter 25, book "Aircraft structures for engineering students")
+    :param lams: list of 3 laminate objects [bottom flange, web, top flange]
+    :param bs: the heihgt of the corresponding flanges as seen as cross section.
+    :return: moment of inertia
+    """
     y_bar = neutral_axis_bending(lams, bs)
     s = 0
     Ixx_lst = []
@@ -254,7 +274,7 @@ def Ixx_accent(lams,bs):
 
 def shear_flow_C2(lams,bs,V):
     """
-    Function to calculate the shear in a c_channel beam using section 25.4.2 SAD book
+    Function to calculate the shear in a c_channel beam (using section 25.4.2 , book "Aircraft structures for engineering students")
     :param lams: list of laminates, bottom,web,top
     :param bs: list of corresponding widths
     :param V: Shear force
