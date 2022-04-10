@@ -156,7 +156,7 @@ def crippling_load(lam,b,case='OEF'):
     if case == 'OEF':
         Nxcrit = 12 * lam.D[2, 2] / bs[idx] ** 2
     elif case == 'NEF':
-          Nxcrit = 2*m.pi**2/b**2*(np.sqrt(lam.D[0,0]*lam/D[1,1])+(lam.D[0,1]+2*lam.D[2,2]))
+          Nxcrit = 2*m.pi**2/b**2*(np.sqrt(lam.D[0,0]*lam.D[1,1])+(lam.D[0,1]+2*lam.D[2,2]))
     else:
         raise Exception(f"the varaible 'case' should be equal to 'OEF' or 'NEF'.")
     return Nxcrit
@@ -250,16 +250,18 @@ def buckling(lam,a,b,Nx,Nxy):
     D12 = lam.D[0,1]
     D66 = lam.D[2,2]
     D22 = lam.D[1,1]
+    a = 2
+    AR = a/b
     k = Nxy/Nx
     N01 = m.pi**2/a**2*(D11+2*(D12+2*D66)*a**2/b**2+D22*a**4/b**4)/(2-8192/81*a**2/b**2/m.pi**4*k**2)*(5+np.sqrt(9+65536*a**2*k**2/(81*m.pi**4*b**2)))
     N02 = m.pi ** 2 / a ** 2 * (D11 + 2 * (D12 + 2 * D66) * a ** 2 / b ** 2 + D22 * a ** 4 / b ** 4) / (
                 2 - 8192 / 81 * a ** 2 / b ** 2 / m.pi ** 4 * k ** 2) * (
                      5 - np.sqrt(9 + 65536 * a ** 2 * k ** 2 / (81 * m.pi ** 4 * b ** 2)))
-    if N01<N02:
+    if abs(N01)<abs(N02):
         N0 = N01
     else:
         N0 = N02
-    return N0>-Nx
+    return N0<Nx
 
 def Ixx_accent(lams,bs):
     """
@@ -315,6 +317,34 @@ def shear_flow_C2(lams,bs,V):
     q_arr[100::] = Ebi3 * V / I_xx * lams[2].h * y3 * s_arr3+q_arr[99]
     return q_arr
 
+def bending_stress_web(lams,bs,M):
+    y_bar = neutral_axis_bending(lams,bs)
+    I_xx = Ixx_accent(lams,bs)
+    web = lams[1]
+    web.general_params()
+    d = np.linalg.inv(web.D)  # inverse of A-matrix (no coupling as layup is symmetrical)
+    Ebi = 12 / d[0, 0] / web.h ** 3  # membrane stiffness
+    y_arr = np.linspace(lams[0].h-y_bar,lams[0].h+bs[1]-y_bar,20)
+
+    sigma_z = Ebi*M/I_xx*y_arr
+    return sigma_z
+
+def bending_stress_flange(lams,bs,M,idx):
+    y_bar = neutral_axis_bending(lams,bs)
+    I_xx = Ixx_accent(lams,bs)
+    flange = lams[idx]
+    web.general_params()
+    d = np.linalg.inv(flange.D)  # inverse of A-matrix (no coupling as layup is symmetrical)
+    Ebi = 12 / d[0, 0] / flange.h ** 3  # membrane stiffness
+    if idx==0:
+        y_arr = lams[0].h/2-y_bar
+    else:
+        y_arr = lams[0].h - y_bar+lams[1].h/2+bs[1]
+
+    sigma_z = Ebi*M/I_xx*y_arr
+    return sigma_z
+
+
 def weight(lams,bs,density):
     Area = 0
     L = 1.75*2*m.pi
@@ -341,6 +371,22 @@ def make_lam(angles):
             Lamina(angle * m.pi / 180, Ex, Ey, vxy, Gxy, z_coord[idx][0], z_coord[idx][1]))  # from bottom to top
     return obj
 
+def get_signed_abs_max(arr):
+    abs_arr = np.abs(arr)
+    max = abs_arr.max()
+    if max==arr.max():
+        return max
+    else:
+        return -max
+def buckling_pure_shear(lam,ba,b,Nxy):
+    D11 = lam.D[0, 0]
+    D12 = lam.D[0, 1]
+    D66 = lam.D[2, 2]
+    D22 = lam.D[1, 1]
+    AR = a / b
+    Nxycrit = 9*m.pi**4*b/32/a**3*(D11+2*(D12+2*D66)*a**2/b**2+D22*AR**4)
+
+    return Nxycrit
 #####-------------------------------------------------------END Helper functions----------------------------------------------------
 
 
@@ -534,28 +580,23 @@ st.pyplot(fig)
 
 #####-------------------------------------------------------Find best layup/bs combo at theta==90-----------------------------
 base_sample = [[45,90,-45],[0,0],[0,0]]
-angles_og = [45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0]
+angles_og = [[45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0],[45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0],[45,90,-45,20,-20,0,0,90,0,0,45,90,-45,0,0]]
 weight_lst = []
 layup_lst = []
 bs_lst = []
-theta = 90
-for b1 in range(25,51):
-    for b2 in range(20,35):
-        print(f'Progress= {round((b1-25)/26*100,2)}%')
-        bs = [b1/100,b2/100,b1/100]
+theta = 45
+angles = []
+for b1 in range(30,40):
+    for b3 in range(30,40):
+        print(f'Progress= {round(((b1-30)*10+(b3-30)),2)}%')
+        bs = [b1/100,35/100,b3/100]
         idx_base = 0
         angles = angles_og.copy()
         failure = True
         while failure:
             failure_lst = []
             #make 3 laminates and put them in a list
-            angles += base_sample[idx_base]
-            angles_sym = get_angles(angles,1)
-            lams = [make_lam(angles_sym),web,make_lam(angles_sym)]
-            #change index basesample:
-            idx_base +=1
-            if idx_base==len(base_sample):
-                idx_base = 0
+            lams = [make_lam(get_angles(angles[0],1)),make_lam(get_angles(angles[1],1)),make_lam(get_angles(angles[2],1))]
 
             #evaluate the forces at theta=90deg
             N, M, V = get_main_forces(theta)
@@ -568,7 +609,7 @@ for b1 in range(25,51):
             #evaluat stresses for each laminate togethher with buckling criteria
             for idx,lam in enumerate(lams):
                 if idx != 1:
-                    strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, shear_flow[50*idx:(50*idx+1)].max()]),
+                    strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, get_signed_abs_max(shear_flow[50*idx:(50*idx+1)])]),
                                                       np.array([0, 0, 0]))
                     # manually add the curvature to the strains
                     lam.strains_curvs[0] = (lams[0].h / 2 - neutral_axis_bending(lams, bs)) * k_beam * (1-2*idx)
@@ -577,63 +618,104 @@ for b1 in range(25,51):
 
                     #check for stresses/Hashin failure criteria
                     stresses,z = lam.stress(points_per_ply=10)
-                    if lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True):
+                    hashin,mode = lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=True)
+                    if hashin:
                         failure_lst.append(True)
+
+                        if mode == 'FF':
+                            angles[idx] = angles[idx]+[0,0,0,0]
+                            angles[2 - idx] = angles[2 - idx] + [0, 0,0,0]
+                        else:
+                            angles[idx] = angles[idx]+[45,90,-45,0,0]
+                            angles[2-idx] = angles[2-idx] + [0, 0]
                     else:
                         failure_lst.append(False)
 
-                    #check for buckling
-                    failure_lst.append(buckling(lam,1.75*2*m.pi,bs[idx],force[idx]/knockdown, shear_flow[50*idx:(50*idx+1)].max()/knockdown))
 
-                    #check for crippling
-                    Nx_crit = crippling_load(lam,bs[idx],case='OEF')
-                    if Nx_crit<force[idx]:
-                        failure_lst.append(True)
+                    if lam.strains_curvs[0]<0:
+                        bending_load = bending_stress_flange(lams, bs, M, idx)*lam.h
+                        #check for buckling
+                        buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx], (force[idx]/bs[idx]+bending_load)/knockdown,
+                                 get_signed_abs_max(shear_flow[50 * idx:(50 * (idx + 1))]) / knockdown)
+                        if buckling_crit:
+                            failure_lst.append(True)
+                            angles[idx] = angles[idx]+[45,90,-45]
+                            angles[2 - idx] = angles[2 - idx] + [0, 0]
+                        else:
+                            failure_lst.append(False)
+                        #check for crippling
+                        Nx_crit = crippling_load(lam,bs[idx],case='OEF')
+                        if Nx_crit<(force[idx]/bs[idx]+bending_load):
+                            failure_lst.append(True)
+                            angles[idx] = [45, 90, -45] + angles[idx]
+                            angles[2 - idx] = angles[2 - idx] + [0, 0]
+                        else:
+                            failure_lst.append(False)
                     else:
                         failure_lst.append(False)
-                # #check the web plate.
-                # else:
-                #     strains = lam.calc_strains(
-                #         np.array([force[idx] / bs[idx], 0, shear_flow[50 * idx:(50 * idx + 1)].max()]),
-                #         np.array([0, 0, 0]))
-                #     # manually add the curvature to the strains
-                #     web.strains_curvs[3::] = 0
-                #     web.strains_curvs[5] = k_beam
-                #
-                #     # check for stresses/Hashin failure criteria
-                #     stresses, z = lam.stress(points_per_ply=10)
-                #     if lam.Hashin_failure(Xt, Yt, Xc, Yc, S, insitu=True):
-                #         failure_lst.append(True)
-                #     else:
-                #         failure_lst.append(False)
-                #
-                #     # check for buckling
-                #     failure_lst.append(buckling(lam, 1.75 * 2 * m.pi, bs[idx], force[idx] / knockdown,
-                #                                 shear_flow[50 * idx:(50 * idx + 1)].max() / knockdown))
-                #
-                #     # check for crippling
-                #     Nx_crit = crippling_load(lam, bs[idx], case='OEF')
-                #     if Nx_crit < force[idx]:
-                #         failure_lst.append(True)
-                #     else:
-                #         failure_lst.append(False)
+                        failure_lst.append(False)
 
+                #check the web plate.
+                else:
+                    bend_load = bending_stress_web(lams, bs, M)*lam.h #the maximum load induced by bending ths is in [N/m]
+                    strains = lam.calc_strains(
+                        np.array([force[idx] / bs[idx] + get_signed_abs_max(bend_load), 0, get_signed_abs_max(shear_flow[50 * idx:(50 * idx + 1)])]),
+                        np.array([0, 0, 0])) #the Nx has the load from bending added
+
+                    # check for stresses/Hashin failure criteria
+                    stresses, z = lam.stress(points_per_ply=10)
+                    hashin, mode = lam.Hashin_failure(Xt, Yt, Xc, Yc, S, insitu=True)
+                    if hashin:
+                        failure_lst.append(True)
+                        if mode == 'FF':
+                            angles[idx] = angles[idx] + [0, 0, 0, 0]
+                        else:
+                            angles[idx] = angles[idx] + [45, 90, -45]
+
+                    else:
+                        failure_lst.append(False)
+
+                    # check for buckling
+                    buck_force = force[idx]/bs[idx] + bend_load.min()*lam.h
+                    buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx], buck_force / knockdown,
+                                             get_signed_abs_max(shear_flow[50 * idx:(50 * (idx + 1))]) / knockdown)
+                    if buckling_crit:
+                        failure_lst.append(True)
+                        angles[idx] = angles[idx] + [45, 90, -45]
+                    else:
+                        failure_lst.append(False)
+                    # check for crippling
+                    Nx_crit = crippling_load(lam, bs[idx], case='NEF')
+                    if Nx_crit < (force[idx]/bs[idx]+ bend_load.min()*lam.h):
+                        failure_lst.append(True)
+                        angles[idx] = [45, 90, -45] + angles[idx]
+                    else:
+                        failure_lst.append(False)
+            # print(f'N_plies: {len(angles[0]),len(angles[1]),len(angles[2])}')
+            # print(failure_lst)
             if not any(failure_lst):
                 failure = False
+
         weight_lst.append(weight(lams,bs,density))
         layup_lst.append(angles)
         bs_lst.append(bs)
 
 #get index of lowest weight
-idx_opt = weight_lst.index(min(weight_lst))
-print(layup_lst[idx])
-print(bs_lst[idx])
-print('Thickness of the laminate: ',len(layup_lst[idx])*t_ply)
-print('Number of plies: ',len(layup_lst[idx]))
+idx_opt = weight_lst.index(max(weight_lst))
+print(layup_lst[idx_opt])
+print(bs_lst[idx_opt])
+print('Thickness of the laminates: ',len(layup_lst[idx_opt][0])*t_ply*2,len(layup_lst[idx_opt][1])*t_ply*2,len(layup_lst[idx_opt][2])*t_ply*2)
+print('Number of plies: ',len(layup_lst[idx_opt][0])*2,len(layup_lst[idx_opt][1])*2,len(layup_lst[idx_opt][2])*2)
 
-plt.scatter(range(25,51),weight_lst)
+
+plt.scatter(range(len(weight_lst)),weight_lst)
 plt.show()
 #####-------------------------------------------------------END Find best layup/bs combo at theta==90-----------------------------
+
+
+####--------------------------------------------------------Check layup and the stresses-----------------------------------------
+
+angles = [[45, 90, -45, 20, -20, 0, 0, 90, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [45, 90, -45, 20, -20, 0, 0, 90, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [45, 90, -45, 20, -20, 0, 0, 90, 0, 0, 45, 90, -45, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 45, 90, -45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
 
 
 

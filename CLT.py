@@ -707,7 +707,7 @@ class Laminate:
 
             if mode=='IFF' or mode=='FF':
                 failure = True
-        return failure
+        return failure,mode
     def __str__(self):
 
         text = '\nGeneral Parameters of the Laminate: \n'
