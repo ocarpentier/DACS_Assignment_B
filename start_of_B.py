@@ -826,8 +826,9 @@ new_angle[0].reverse()
 new_angle[1].reverse()
 new_angle[2].reverse()
 
-print(len(new_angle[1]))
-
+print('here')
+print(new_angle[1])
+print('overlap',overlap)
 ####--------------------------------------------------------Check stresses with new layup-----------------------------------------
 # for theta in range(91):
 #     bs = [48/100,35/100,23/100]
@@ -962,9 +963,9 @@ for theta in range(91):
     print(theta)
     weight_lst_temp = []
     bs_lst_temp = []
-    for b1 in range(10,48):
+    for b1 in range(48,49):
         for b2 in range(10,35):
-            for b3 in range(10,23):
+            for b3 in range(23,24):
                 bs = [b1/100,b2/100,b3/100]
 
                 failure_lst = []
@@ -1082,7 +1083,7 @@ print(bs_lst,'\n',weight_lst,'\n',theta_lst)
 b1_lst = []
 b2_lst = []
 b3_lst = []
-for idx,weight_lst_temp in weight_lst:
+for idx,weight_lst_temp in enumerate(weight_lst):
     idx_opt = weight_lst_temp.index(min(weight_lst_temp))
     b1_lst.append(bs_lst[idx][idx_opt][0])
     b2_lst.append(bs_lst[idx][idx_opt][1])
