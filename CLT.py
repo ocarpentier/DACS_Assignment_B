@@ -646,25 +646,27 @@ class Laminate:
         :param insitu: Optional, Default=False. If true calculates failure with insitu strengths
         :return: Boolean True if fpf has occured, false if not.
         """
-        def insitu_func(inner,E1,E2,G12,mu21):
 
-            beta = 1.04*1e-26 #[Pa^-3]
-            Gic = 258 #[N/m]
-            Giic = 1080 #[N/m]
+        def insitu_func(inner, E1, E2, G12, mu21):
+
+            beta = 1.04 * 1e-26  # [Pa^-3]
+            Gic = 258  # [N/m]
+            Giic = 1080  # [N/m]
 
             delta22 = 2 * (1 / E2 - mu21 ** 2 / E1)
             if inner:
                 phi = 48 * Giic / np.pi / self.plies[0].t
-                S12_insitu = np.sqrt((np.sqrt(1+beta*phi*G12**2)-1)/3/beta/G12)
-                Yt = np.sqrt(8*Gic/np.pi/self.plies[0].t/delta22)
+                S12_insitu = np.sqrt((np.sqrt(1 + beta * phi * G12 ** 2) - 1) / 3 / beta / G12)
+                Yt = np.sqrt(8 * Gic / np.pi / self.plies[0].t / delta22)
             else:
                 phi = 24 * Giic / np.pi / self.plies[0].t
                 S12_insitu = np.sqrt((np.sqrt(1 + beta * phi * G12 ** 2) - 1) / 3 / beta / G12)
-                Yt = 1.79*np.sqrt(Gic/np.pi/self.plies[0].t/delta22)
+                Yt = 1.79 * np.sqrt(Gic / np.pi / self.plies[0].t / delta22)
 
-            return S12_insitu,Yt
+            return S12_insitu, Yt
 
-
+        S12_og = S12
+        Yt_og = Yt
         # start loop to search failurepoints
         mode = ''
         failure=False
@@ -673,9 +675,9 @@ class Laminate:
             #account for the insitu condition
             if insitu:
                 if idx==0 or idx == self.n_plies-1:
-                    S12,Yt = insitu_func(False,ply.E1,ply.E2,ply.G12,ply.v21)
+                    S12,Yt = insitu_func(False,ply.E1,ply.E2,ply.G12,ply.v21,S12_og, Yt_og)
                 else:
-                    S12, Yt = insitu_func(True,ply.E1,ply.E2, ply.G12, ply.v21)
+                    S12, Yt = insitu_func(True,ply.E1,ply.E2, ply.G12, ply.v21,S12_og, Yt_og)
 
 
             tau12 = ply.abs_max_sigma3
@@ -691,23 +693,27 @@ class Laminate:
 
             #IFF
             sigma2 = ply.abs_max_sigma2
+            # print(tau12 * 1e-6, 'MPa')
             #tension criteria
             if sigma2>0:
                 crit_M_T = sigma2**2/Yt**2+tau12**2/S12**2
                 if crit_M_T>1:
                     mode = 'IFF'
+                    # print(f'fails as IFF T{sigma2*1e-6,tau12*1e-6,crit_M_T,ply.angle*180/np.pi}')
 
             #compression criteria
             elif sigma2<0:
                 # crit_M_C = (((-Yc)/(2*S12))**2-1)*sigma2/(-Yc)+(sigma2/(2*S12))**2+tau12/S12
-                crit_M_C = (-sigma2)/Yc+tau12**2/S12**2
+                crit_M_C = sigma2*Yc/4/S12**2+sigma2**2/4/S12**2+(-sigma2)/Yc+tau12**2/S12**2
                 if crit_M_C>1:
                     mode = 'IFF'
-
+                    # print(f'fails as IFF C {sigma2*1e-6,tau12*1e-6,crit_M_C,ply.angle*180/np.pi}')
+            #
 
             if mode=='IFF' or mode=='FF':
                 failure = True
         return failure,mode
+
     def __str__(self):
 
         text = '\nGeneral Parameters of the Laminate: \n'
