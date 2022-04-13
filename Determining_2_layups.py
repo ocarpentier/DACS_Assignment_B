@@ -452,7 +452,7 @@ angles_og = [[45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -
 weight_lst = []
 layup_lst = []
 bs_lst = []
-theta = 45
+theta = 0
 angles = []
 
 bs = [48/100,35/100,23/100]
@@ -479,54 +479,55 @@ while failure:
     #evaluat stresses for each laminate togethher with buckling criteria
     for idx,lam in enumerate(lams):
         if idx != 1:
-            strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, 0]),
-                                              np.array([0, 0, 0]))
-            # manually add the curvature to the strains
-            lam.strains_curvs[0] = (lams[0].h / 2 - neutral_axis_bending(lams, bs)) * k_beam * (1-2*idx)
-            lam.strains_curvs[3] = k_beam
-            lam.strains_curvs[4::] = 0
-
-            #check for stresses/Hashin failure criteria
-            stresses,z = lam.stress(points_per_ply=10)
-            hashin,mode = lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=False)
-            if hashin:
-                failure_lst.append(True)
-
-                if mode == 'FF':
-                    # print('Hashin FF')
-                    angles[idx] = angles[idx]+[0,0,0,0]
-                    angles[2 - idx] = angles[2 - idx] + [0, 0,0,0]
-                else:
-                    # print('Hashin IFF',idx)
-                    angles[idx] = angles[idx]+[90,45,0,-45]
-                    angles[2-idx] = angles[2-idx] + [0, 0,0,0]
-            else:
-                failure_lst.append(False)
-
-
-            if lam.strains_curvs[0]<0:
-                bending_load = bending_stress_flange(lams, bs, M, idx)*lam.h
-                #check for buckling
-                buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx]/2, (force[idx]/bs[idx]+bending_load)/knockdown,0)
-                if buckling_crit:
-                    print('Buck_fail')
-                    failure_lst.append(True)
-                    angles[idx] = angles[idx]+[45,90,-45]
-                    angles[2 - idx] = angles[2 - idx] + [0, 0]
-                else:
-                    failure_lst.append(False)
-                #check for crippling
-                Nx_crit = crippling_load(lam,bs[idx],case='OEF')
-                if Nx_crit<(force[idx]/bs[idx]+bending_load):
-                    print('crippling')
-                    failure_lst.append(True)
-                    angles[idx] = [45, 90, -45] + angles[idx]
-                    angles[2 - idx] = angles[2 - idx] + [0, 0]
-                else:
-                    failure_lst.append(False)
-            else:
-                failure_lst.append(False)
-                failure_lst.append(False)
+            pass
+            # strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, 0]),
+            #                                   np.array([0, 0, 0]))
+            # # manually add the curvature to the strains
+            # lam.strains_curvs[0] = (lams[0].h / 2 - neutral_axis_bending(lams, bs)) * k_beam * (1-2*idx)
+            # lam.strains_curvs[3] = k_beam
+            # lam.strains_curvs[4::] = 0
+            #
+            # #check for stresses/Hashin failure criteria
+            # stresses,z = lam.stress(points_per_ply=10)
+            # hashin,mode = lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=False)
+            # if hashin:
+            #     failure_lst.append(True)
+            #
+            #     if mode == 'FF':
+            #         # print('Hashin FF')
+            #         angles[idx] = angles[idx]+[0,0,0,0]
+            #         angles[2 - idx] = angles[2 - idx] + [0, 0,0,0]
+            #     else:
+            #         # print('Hashin IFF',idx)
+            #         angles[idx] = angles[idx]+[90,45,0,-45]
+            #         angles[2-idx] = angles[2-idx] + [0, 0,0,0]
+            # else:
+            #     failure_lst.append(False)
+            #
+            #
+            # if lam.strains_curvs[0]<0:
+            #     bending_load = bending_stress_flange(lams, bs, M, idx)*lam.h
+            #     #check for buckling
+            #     buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx]/2, (force[idx]/bs[idx]+bending_load)/knockdown,0)
+            #     if buckling_crit:
+            #         print('Buck_fail')
+            #         failure_lst.append(True)
+            #         angles[idx] = angles[idx]+[45,90,-45]
+            #         angles[2 - idx] = angles[2 - idx] + [0, 0]
+            #     else:
+            #         failure_lst.append(False)
+            #     #check for crippling
+            #     Nx_crit = crippling_load(lam,bs[idx],case='OEF')
+            #     if Nx_crit<(force[idx]/bs[idx]+bending_load):
+            #         print('crippling')
+            #         failure_lst.append(True)
+            #         angles[idx] = [45, 90, -45] + angles[idx]
+            #         angles[2 - idx] = angles[2 - idx] + [0, 0]
+            #     else:
+            #         failure_lst.append(False)
+            # else:
+            #     failure_lst.append(False)
+            #     failure_lst.append(False)
 
         #check the web plate.
         else:
@@ -572,7 +573,8 @@ while failure:
     if not any(failure_lst):
         failure = False
 
-print(angles)
+print(len(angles[1]))
+print(angles[1])
 #
 # #get index of lowest weight
 # idx_opt = weight_lst.index(min(weight_lst))
@@ -798,4 +800,128 @@ print(len(new_angle045[1])*2)
 print(len(new_angle045[2])*2)
 
 
-###3
+
+# ###-------------------------------------Check at what load it will fail and for which failure mode-----------------------------------
+new_angle045 = [[45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, -45, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0,45],
+                [45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, -45, 90, 45, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0],
+                [45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45,0,0, 45, 90, -45,0,0, 45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45,0,0, 45, 90, -45,0,0, 45, 90, -45, 0, 0, 45, 90, -45,  0, 0]]
+
+new_angle4590 = [[45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, -45, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45, 0, 0, 0, 0,45],
+                 [45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45, 45, 90, -45,0,0, 45, 90, -45,0,0, 45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45, 0,0,45, 90, -45,0,0, 45, 90, -45,0,0, 45, 90, -45, 0, 0, 45, 90, -45,  0, 0],
+                 [45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, 45, 90, -45, -45, 90, 45, -45, 90, 0, 0, 0, 0, 45, 0, 0, 0, 0, -45,  0, 0, 0, 0, 90, 0, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0, 0, 90, 0, 0, 0, 45, 0, 0, 0, -45, 0, 0]]
+
+for F_ult in range(837000,900000,1000):
+    print('Were at Fult: ',F_ult)
+    for theta in range(91):
+        bs = [48/100,35/100,23/100]
+
+        failure_lst = []
+        #make 3 laminates and put them in a list
+        if theta<45:
+            lams = [make_lam(get_angles(new_angle045[0],1)),make_lam(get_angles(new_angle045[1],1)),make_lam(get_angles(new_angle045[2],1))]
+        else:
+            lams = [make_lam(get_angles(new_angle4590[0], 1)), make_lam(get_angles(new_angle4590[1], 1)),
+                    make_lam(get_angles(new_angle4590[2], 1))]
+
+        #evaluate the forces at theta=90deg
+        N, M, V = get_main_forces(theta,F=F_ult)
+        force = forces(lams, bs, N)
+        moment = moments(lams, bs, M)
+
+        k_beam = 1 / radius(lams, bs, M)  # determine the curvature using lecture 4 slides
+
+        #evaluat stresses for each laminate togethher with buckling criteria
+        for idx,lam in enumerate(lams):
+            if idx != 1:
+                strains = lam.calc_strains(np.array([force[idx] / bs[idx], 0, 0]),
+                                                  np.array([0, 0, 0]))
+                # manually add the curvature to the strains
+                lam.strains_curvs[0] = (lams[0].h / 2 - neutral_axis_bending(lams, bs)) * k_beam * (1-2*idx)
+                lam.strains_curvs[3] = k_beam
+                lam.strains_curvs[4::] = 0
+
+                #check for stresses/Hashin failure criteria
+                stresses,z = lam.stress(points_per_ply=10)
+                hashin,mode = lam.Hashin_failure(Xt,Yt,Xc,Yc,S,insitu=False)
+                if hashin:
+                    failure_lst.append(True)
+
+                    if mode == 'FF':
+                        print('Hashin FF')
+                        angles[idx] = angles[idx]+[0,0,0,0]
+                        angles[2 - idx] = angles[2 - idx] + [0, 0,0,0]
+                    else:
+                        print('Hashin IFF',idx)
+                        angles[idx] = angles[idx]+[90,45,0,-45]
+                        angles[2-idx] = angles[2-idx] + [0, 0,0,0]
+                else:
+                    failure_lst.append(False)
+
+
+                if lam.strains_curvs[0]<0:
+                    bending_load = bending_stress_flange(lams, bs, M, idx)*lam.h
+                    #check for buckling
+                    buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx]/2, (force[idx]/bs[idx]+bending_load)/knockdown,0)
+                    if buckling_crit:
+                        print('Buck_fail')
+                        failure_lst.append(True)
+                        angles[idx] = angles[idx]+[45,90,-45]
+                        angles[2 - idx] = angles[2 - idx] + [0, 0]
+                    else:
+                        failure_lst.append(False)
+                    #check for crippling
+                    Nx_crit = crippling_load(lam,bs[idx],case='OEF')
+                    if Nx_crit<(force[idx]+bending_load*bs[idx]):
+                        print('crippling')
+                        failure_lst.append(True)
+                        angles[idx] = [45, 90, -45] + angles[idx]
+                        angles[2 - idx] = angles[2 - idx] + [0, 0]
+                    else:
+                        failure_lst.append(False)
+                else:
+                    failure_lst.append(False)
+                    failure_lst.append(False)
+
+            #check the web plate.
+            else:
+                bend_load = bending_stress_web(lams, bs, M)*lam.h #the maximum load induced by bending ths is in [N/m]
+                strains = lam.calc_strains(
+                    np.array([force[idx] / bs[idx] + get_signed_abs_max(bend_load), 0, V/lam.h]),
+                    np.array([0, 0, 0])) #the Nx has the load from bending added
+
+                # check for stresses/Hashin failure criteria
+                stresses, z = lam.stress(points_per_ply=10)
+                hashin, mode = lam.Hashin_failure(Xt, Yt, Xc, Yc, S, insitu=False)
+                if hashin:
+                    failure_lst.append(True)
+                    if mode == 'FF':
+                        print('FF')
+                        # angles[idx] = angles[idx] + [0, 0, 0, 0]
+                    # else:
+                        # print('IFF')
+                        # print('IFF')
+                        # angles[idx] = angles[idx] + [45, 90, -45]
+
+                else:
+                    failure_lst.append(False)
+
+                # check for buckling
+                buck_force = force[idx]/bs[idx] + bend_load.min()*lam.h
+                buckling_crit = buckling(lam, 1.75 * 2 * m.pi, bs[idx], buck_force / knockdown,
+                                         V/lam.h / knockdown)
+                if buckling_crit:
+                    failure_lst.append(True)
+                    angles[idx] = angles[idx] + [45, 90, -45]
+                else:
+                    failure_lst.append(False)
+                # check for crippling
+                Nx_crit = crippling_load(lam, bs[idx], case='NEF')
+                if Nx_crit < (force[idx]/bs[idx]+ bend_load.min()*lam.h):
+                    failure_lst.append(True)
+                    angles[idx] = [45, 90, -45] + angles[idx]
+                else:
+                    failure_lst.append(False)
+        # print(f'N_plies: {len(angles[0]),len(angles[1]),len(angles[2])}')
+        # print(failure_lst)
+        if any(failure_lst):
+            print(theta,failure_lst,F_ult)
